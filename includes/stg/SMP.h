@@ -135,7 +135,7 @@ xchg(StgPtr p, StgWord w)
     __asm__ __volatile__ ("swp %0, %1, [%2]"
                          : "=&r" (result)
                          : "r" (w), "r" (p) : "memory");
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)) || aarch64_HOST_ARCH
     // swp instruction which is used in pre-ARMv6 code above
     // is deprecated in AMRv6 and later. ARM, Ltd. *highly* recommends
     // to use ldrex/strex instruction pair for the same purpose
@@ -205,7 +205,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     if (r == o) { *p = n; } 
     arm_atomic_spin_unlock();
     return r;
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)) || aarch64_HOST_ARCH
     StgWord result,tmp;
 
     __asm__ __volatile__(
@@ -311,7 +311,7 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7) || aarch64_HOST_ARCH
     __asm__ __volatile__ ("dmb  st" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -330,7 +330,7 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)) || aarch64_HOST_ARCH
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -350,7 +350,7 @@ load_load_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)) || aarch64_HOST_ARCH
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;
