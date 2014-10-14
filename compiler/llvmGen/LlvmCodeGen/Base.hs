@@ -455,7 +455,8 @@ generateExternDecls = do
   delayed <- fmap uniqSetToList $ getEnv envAliases
   defss <- flip mapM delayed $ \lbl -> do
     m_ty <- funLookup lbl
-    -- If we have a definition we've already emitted the proper aliases
+    case m_ty of
+      -- If we have a definition we've already emitted the proper aliases
       -- when the symbol itself was emitted by @aliasify@
       Just _ -> return []
 
