@@ -135,7 +135,7 @@ xchg(StgPtr p, StgWord w)
     __asm__ __volatile__ ("swp %0, %1, [%2]"
                          : "=&r" (result)
                          : "r" (w), "r" (p) : "memory");
-#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)) || aarch64_HOST_ARCH
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
     // swp instruction which is used in pre-ARMv6 code above
     // is deprecated in AMRv6 and later. ARM, Ltd. *highly* recommends
     // to use ldrex/strex instruction pair for the same purpose
@@ -150,6 +150,19 @@ xchg(StgPtr p, StgWord w)
 #if !defined(arm_HOST_ARCH_PRE_ARMv7)
                           "      dmb\n"
 #endif
+                          : "=&r" (result), "=&r" (tmp)
+                          : "r" (w), "r" (p)
+                          : "memory"
+                          );
+#elif aarch64_HOST_ARCH
+    // Don't think we actually use tmp here, but leaving
+    // it for consistent numbering
+    StgWord tmp; 
+    __asm__ __volatile__ (
+                          "1:    ldaxr  %0, [%3]\n"
+                          "      stlxr  %w0, %2, [%3]\n"
+                          "      cbnz   %w0, 1b\n"
+                          "      dmb sy\n"
                           : "=&r" (result), "=&r" (tmp)
                           : "r" (w), "r" (p)
                           : "memory"
@@ -205,7 +218,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     if (r == o) { *p = n; } 
     arm_atomic_spin_unlock();
     return r;
-#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)) || aarch64_HOST_ARCH
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
     StgWord result,tmp;
 
     __asm__ __volatile__(
@@ -220,6 +233,24 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #if !defined(arm_HOST_ARCH_PRE_ARMv7)
         "       dmb\n"
 #endif
+                : "=&r"(tmp), "=&r"(result)
+                : "r"(p), "r"(o), "r"(n)
+                : "cc","memory");
+
+    return result;
+#elif aarch64_HOST_ARCH
+    // Don't think we actually use tmp here, but leaving
+    // it for consistent numbering
+    StgWord result,tmp;
+
+    __asm__ __volatile__(
+        "1:     ldxr %1, [%2]\n"
+        "       mov %w0, #0\n"
+        "       cmp %1, %3\n"
+        "       b.ne 2f\n"
+        "       stxr %w0, %4, [%2]\n"
+        "       cbnz %w0, 1b\n"
+        "2:     dmb sy\n"
                 : "=&r"(tmp), "=&r"(result)
                 : "r"(p), "r"(o), "r"(n)
                 : "cc","memory");
@@ -311,7 +342,7 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("" : : : "memory");
-#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7) || aarch64_HOST_ARCH
+#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)) || aarch64_HOST_ARCH
     __asm__ __volatile__ ("dmb  st" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -330,8 +361,10 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
-#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)) || aarch64_HOST_ARCH
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
+#elif aarch64_HOST_ARCH
+    __asm__ __volatile__ ("dmb sy" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
@@ -350,8 +383,10 @@ load_load_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif (arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)) || aarch64_HOST_ARCH
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
+#elif aarch64_HOST_ARCH
+    __asm__ __volatile__ ("dmb sy" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
